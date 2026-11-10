@@ -1,4 +1,4 @@
-// herdrify: a Spotify now-playing bar for the foot of the window. Album art, the track
+// herdify: a Spotify now-playing bar for the foot of the window. Album art, the track
 // and artist, shuffle, previous, play/pause, next, repeat, a seek bar and a volume bar.
 //
 // It talks to the Spotify desktop app on macOS through AppleScript (`osascript`): one
@@ -10,10 +10,10 @@ import { h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, Slid
 import * as fs from "fs/promises";
 import { exec, appHome, theme, nextCommand, props, layout, run, placement, shared, notify, readTextFile } from "herdr";
 
-const NAME = "herdrify";
+const NAME = "herdify";
 const ICON = (name) => `mods/${NAME}/${name}.svg`;
 const GREEN = "#1ed760";
-const ART_DIR = "data/herdrify/art"; // under appHome(): image() paths are relative to it
+const ART_DIR = "data/herdify/art"; // under appHome(): image() paths are relative to it
 const SEP = "\u001f";
 // Widths below these switch the look: a stacked card for a side panel, one button for a folded rail.
 const COMPACT_BELOW = 480;
@@ -136,7 +136,7 @@ function find(node, id) {
   return null;
 }
 
-export default class Herdrify extends View {
+export default class Herdify extends View {
   init(_props, cx) {
     this.state = null;
     this.width = 900;
@@ -170,7 +170,7 @@ export default class Herdrify extends View {
       await fs.mkdir(`${appHome()}/${ART_DIR}`, { recursive: true }).catch(() => {});
       await this.poll(cx);
     });
-    // herdrify.toggle / .next / .previous / .shuffle / .repeat from keys.json or `herdr-app do`.
+    // herdify.toggle / .next / .previous / .shuffle / .repeat from keys.json or `herdr-app do`.
     cx.spawn(async (cx) => {
       for (;;) {
         const c = String(await nextCommand());
@@ -212,7 +212,7 @@ export default class Herdrify extends View {
     } finally { this.busy = false; }
   }
 
-  // Covers are saved once per track under data/herdrify/art and the older ones removed.
+  // Covers are saved once per track under data/herdify/art and the older ones removed.
   async fetchArt(s) {
     const key = (s.id.split(":").pop() || "x").replace(/[^A-Za-z0-9_-]/g, "");
     const rel = `${ART_DIR}/${key}.jpg`;
@@ -279,7 +279,7 @@ export default class Herdrify extends View {
     cx.notify();
     const name = String(shared("layout") ?? "");
     if (SHIPPED.includes(name)) {
-      notify({ title: "Herdrify", body: `"${name}" is one of Herdr's own layouts and can't be changed. Clone it first (Duplicate layout).`, level: "warning" });
+      notify({ title: "Herdify", body: `"${name}" is one of Herdr's own layouts and can't be changed. Clone it first (Duplicate layout).`, level: "warning" });
       return;
     }
     if (currentSpot(layout(), this.ownId()) === spot) return;

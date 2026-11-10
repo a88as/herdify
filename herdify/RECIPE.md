@@ -1,8 +1,8 @@
-# Herdrify
+# Herdify
 
 A Spotify now-playing bar along the foot of the Herdr window. On the left is the album cover, the track title and the artist. In the middle are shuffle, previous, play/pause, next and repeat, with a seek bar and the elapsed and total time under them. On the right is a volume bar. It controls the Spotify desktop app on macOS through AppleScript. When Spotify isn't running or nothing is playing, the bar shows one centered line with an "Open Spotify" button. A **move** button on the player docks it into a spot of your choice: the sidebar, the top of the work area or above the status bar. It can also float, and then you drag it to any edge of the window (a card on the left and right edges, a bar on the top and bottom). Docked, it takes real space and adapts to the width it gets: narrower than 480 px it becomes a stacked card (cover and title, seek bar, controls), and narrower than 160 px (a folded sidebar) it is a single play/pause button.
 
-![Herdrify](preview.png)
+![Herdify](preview.png)
 
 ## What you see
 
@@ -36,7 +36,7 @@ Left to right, while a track is loaded (playing or paused):
 
 #### Card (160 to 479 px, e.g. a 268 px sidebar)
 
-![Herdrify in the sidebar](sidebar.png)
+![Herdify in the sidebar](sidebar.png)
 
 A column with 12 px horizontal and 10 px vertical padding, 8 px between rows, the same `background` fill and top border. 124 px tall with a track.
 
@@ -81,8 +81,8 @@ Idle states replace all three regions with one centered row: a 14 px `music` ico
   - **Floating** (`picture-in-picture-2`): the root's `floating` list, right edge, end.
 
   Picking a spot removes the player's block (or float) from wherever it is and adds it there, then runs `layout.set`. Docked blocks get `props.block` set to their own id. The player reloads in its new place within a second, and the layout file keeps the change. On one of Herdr's own layouts (`main`, `terminals`, `win98`), it posts a warning toast instead: those can't be changed, so clone one first.
-- **Commands.** `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle` and `herdrify.repeat` do the same as the buttons. `herdrify.mute` mutes or unmutes. `herdrify.move` opens or closes the picker. `herdrify.dock-sidebar`, `herdrify.dock-top`, `herdrify.dock-bottom` and `herdrify.dock-float` move it directly. Bind them in `keys.json` (for example `"global": { "ctrl-alt-space": "herdrify.toggle" }`) or run `herdr-app do herdrify.next`. They reach only a shown copy.
-- **Cover art.** When the track's `artwork url` changes, the mod downloads it with `curl` to `data/herdrify/art/<track id>.jpg` and deletes any other file in that folder, so only the current cover is kept.
+- **Commands.** `herdify.toggle`, `herdify.next`, `herdify.previous`, `herdify.shuffle` and `herdify.repeat` do the same as the buttons. `herdify.mute` mutes or unmutes. `herdify.move` opens or closes the picker. `herdify.dock-sidebar`, `herdify.dock-top`, `herdify.dock-bottom` and `herdify.dock-float` move it directly. Bind them in `keys.json` (for example `"global": { "ctrl-alt-space": "herdify.toggle" }`) or run `herdr-app do herdify.next`. They reach only a shown copy.
+- **Cover art.** When the track's `artwork url` changes, the mod downloads it with `curl` to `data/herdify/art/<track id>.jpg` and deletes any other file in that folder, so only the current cover is kept.
 - **Width.** The block measures itself with `on_size_change` and picks its look from that width: bar, card (below 480 px) or rail (below 160 px). In the bar, below 720 px the volume region hides and the track region narrows to 200 px. Folding or widening a sidebar switches the look live.
 - **Height.** With `props.block` set to its own block id, the mod resizes that block to fit the look: bar 72 px, card 124 px with a track and 44 px idle, rail 52 px. It runs `layout.resize {id, px}` only when the height it wants changes. Without `props.block` the layout's size stands.
 
@@ -91,33 +91,33 @@ Idle states replace all three regions with one centered row: a 14 px `music` ico
 **As a floating block** (recommended), in a personal layout's root:
 
 ```json
-"floating": [ { "id": "herdrify", "content": { "mod": "herdrify" }, "edge": "right", "align": "end" } ]
+"floating": [ { "id": "herdify", "content": { "mod": "herdify" }, "edge": "right", "align": "end" } ]
 ```
 
 It starts in the bottom-right corner over the root node, 12 px in from the edge. When dropped, it snaps to the nearest edge and to the start, centre or end of it, and Herdr saves that spot in `layouts/.state/` (a later edit to the layout file wins over it). A press on the buttons or sliders does not drag it. A press on the cover and title does, and a plain click there still opens Spotify. No `props` are needed.
 
-**mod.json**: `{ "place": "bottom", "size": 72, "title": "Herdrify" }`. When Herdr first sees the folder it docks one copy at the bottom of the shown layout, if that layout is a personal one (Herdr's shipped layouts take no new blocks). To place it yourself, add a block to a personal layout. Across the window or the work area:
+**mod.json**: `{ "place": "none", "title": "Herdify" }`. The mod never docks itself: put it in a personal layout (Herdr's shipped layouts take no new blocks) and move it from then on with its move button. Across the work area, just before `status`:
 
 ```json
-{ "id": "herdrify", "type": "block", "size": { "px": 72 }, "content": { "mod": "herdrify" } }
+{ "id": "herdify", "type": "block", "size": { "px": 72 }, "content": { "mod": "herdify" } }
 ```
 
 In the shipped sidebar (`sidebar` column), between `sidebar-lists` and `sidebar-footer`, with `props.block` so it sizes itself:
 
 ```json
-{ "id": "herdrify", "type": "block", "size": { "px": 124 }, "content": { "mod": "herdrify", "props": { "block": "herdrify" } } }
+{ "id": "herdify", "type": "block", "size": { "px": 124 }, "content": { "mod": "herdify", "props": { "block": "herdify" } } }
 ```
 
 **Props:** `block` (optional): the id of the block holding this copy, so it can fit its height.
 
-**Files** in `mods/herdrify/`: `main.js`, `mod.json`, and Lucide icons (lucide-static 0.460.0, ISC): `play`, `pause`, `skip-back`, `skip-forward`, `shuffle`, `repeat`, `volume-1`, `volume-2`, `volume-x`, `music`, `disc-3`, and for moving `move`, `panel-left`, `panel-top`, `panel-bottom`, `picture-in-picture-2`, `x` (`.svg`). They are drawn with `svg("mods/herdrify/<name>.svg")`, so they take the text color.
+**Files** in `mods/herdify/`: `main.js`, `mod.json`, and Lucide icons (lucide-static 0.460.0, ISC): `play`, `pause`, `skip-back`, `skip-forward`, `shuffle`, `repeat`, `volume-1`, `volume-2`, `volume-x`, `music`, `disc-3`, and for moving `move`, `panel-left`, `panel-top`, `panel-bottom`, `picture-in-picture-2`, `x` (`.svg`). They are drawn with `svg("mods/herdify/<name>.svg")`, so they take the text color.
 
 **main.js** is one `View` class.
 
 - Imports: `View, div, svg, image` from `gpui-kit`; `h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState` from `gpui-base`; `fs/promises`; `exec, appHome, theme, nextCommand, props, layout, run, placement, shared, notify, readTextFile` from `herdr`.
 - Two `SliderState`s are made in `init`: seek `0..1000` (per mille of the track) and volume `0..100`. Their `change` events set a dragging flag. Their `release` events send the command.
 - Timers: one `cx.timer.every(1000)` for the clock and the read schedule, and `cx.timer.after(300)` after previous/next.
-- The cover is drawn with `image("data/herdrify/art/<id>.jpg")`. Paths are relative to `appHome()`.
+- The cover is drawn with `image("data/herdify/art/<id>.jpg")`. Paths are relative to `appHome()`.
 
 **The read script**:
 
@@ -143,7 +143,7 @@ Actions are run as `if application "Spotify" is running then tell application "S
 
 ## Watch out
 
-- **It runs programs and reaches the network.** It sends Apple Events to Spotify and downloads cover images over HTTPS with `curl`. It writes only `data/herdrify/art/`. Tell the person before adding it.
+- **It runs programs and reaches the network.** It sends Apple Events to Spotify and downloads cover images over HTTPS with `curl`. It writes only `data/herdify/art/`. Tell the person before adding it.
 - **macOS Automation permission.** macOS decides per app whether Herdr may send Apple Events to Spotify, and may ask the person once. After a refusal, the bar shows the -1743 line with **Open settings**. The 4 s timeout keeps an unanswered read from holding up the bar.
 - **`fs/promises` here has no `stat`.** Use `fs.exists`. A missing function threw inside the read, so the state never left "Looking for Spotify…". Also wrap the cover download in `.catch`, so a cover failure can never block the track from showing.
 - **`Slider*` lives in `gpui-base`, not `gpui-kit`.** `herdr-app check` fails with "Could not find export 'Slider'" otherwise. A `SliderState` must be made in `init`, never in `render`.
@@ -152,28 +152,29 @@ Actions are run as `if application "Spotify" is running then tell application "S
 - **Don't push slider values while dragging,** or the timer pulls the thumb back from under the pointer. Set them only when the dragging flag is off.
 - **Move from the layout file, not `layout()`.** `layout()` has the person's clicks folded in (sizes, the shown stack child, theme picks). Feeding it to `layout.set` wrote them into the file: a first build saved a 1755 px panel width and a `theme` key. Read `layouts/<shared("layout")>.json` with `readTextFile`, change only the player, and pass that to `layout.set`.
 - **Don't dock into the Files/Changes `panel`.** It is `hidden` until a tab bar button opens it, so a player docked there vanishes. Commands then can't reach it either: `<mod>.<command>` only reaches shown copies.
-- **The player's id** is `props.block` when docked and the float's `id` (`herdrify`) when floating. Both are `herdrify`, so a move always finds the old one.
+- **The player's id** is `props.block` when docked and the float's `id` (`herdify`) when floating. Both are `herdify`, so a move always finds the old one.
 - **A float sizes to its content.** Give the floating card and bar fixed widths (260 and 760 px). Never use `size_full` there, and don't draw a background or border, because Herdr's frame already has them. `placement()` is null when the mod isn't floating, and that is how it tells the two apart. Don't call `layout.resize` from a float.
 - **Hiding a float** means rendering an empty `div()`.
 - **Card and rail need their own heights.** The bar's 72 px clips the card. Pass `props.block` (the block's own id) so the mod resizes it, or size the block yourself: 124 px for the card. Guard the resize by remembering the last height asked for, since it runs from `render`.
 - **The first frame is drawn at an assumed 900 px** (bar look) until `on_size_change` reports the real width, so a sidebar copy shows the bar for one frame and then switches.
-- **Shipped layouts don't take the block.** `place: "bottom"` docks only into a personal layout. Add the block to a clone (`layout.clone`) or your own layout.
+- **Keep `place: "none"`.** With `"bottom"`, the first time Herdr saw the folder it wrapped the whole layout in a new column holding a second copy (a block with a generated id and no `props.block`). That copy sat outside the move button's reach, so there were two players, and a later `layout.set` saved the wrapper into the layout file. Undo it by making the old root the file's root again.
+- **Shipped layouts don't take the block.** Add it to a clone (`layout.clone`) or your own layout.
 - **Limits.** macOS and the Spotify desktop app only: no Spotify Web API, no Linux or Windows, no other players. Podcasts and ads show whatever Spotify reports. There is no like/save button, queue or device picker.
 
 ## Done when
 
-- `herdr-app check mods/herdrify` passes.
+- `herdr-app check mods/herdify` passes.
 - With Spotify closed, the bar shows "Spotify isn't running" and **Open Spotify**, and Spotify does not start by itself.
 - With a track playing: the cover, title and artist show, the elapsed time goes up each second, and the seek fill is green.
-- `herdr-app do herdrify.shuffle` turns shuffle on in Spotify and the shuffle icon goes green within 3 s; running it again turns it off.
+- `herdr-app do herdify.shuffle` turns shuffle on in Spotify and the shuffle icon goes green within 3 s; running it again turns it off.
 - Play/pause pauses Spotify, and the button shows the play icon at once.
 - Dragging the seek bar and letting go moves Spotify to that point. Dragging the volume bar changes Spotify's volume.
 - Next and previous change the track, and the new title and cover show within a second.
-- `data/herdrify/art/` holds exactly one `.jpg`, the current track's.
+- `data/herdify/art/` holds exactly one `.jpg`, the current track's.
 - Narrowing the bar below 720 px hides the volume region.
-- `herdr-app do herdrify.dock-sidebar`, `herdrify.dock-top`, `herdrify.dock-bottom` and `herdrify.dock-float` each move the player in a personal layout. Afterwards the file has exactly one `herdrify` node (or float), and nothing else in it changed.
-- `herdr-app do herdrify.mute` sets Spotify's volume to 0 and shows `volume-x` with the slider at 0; running it again puts back the earlier level.
-- `herdrify.move` shows the picker with the current spot in green; `x` brings the player back.
+- `herdr-app do herdify.dock-sidebar`, `herdify.dock-top`, `herdify.dock-bottom` and `herdify.dock-float` each move the player in a personal layout. Afterwards the file has exactly one `herdify` node (or float), and nothing else in it changed.
+- `herdr-app do herdify.mute` sets Spotify's volume to 0 and shows `volume-x` with the slider at 0; running it again puts back the earlier level.
+- `herdify.move` shows the picker with the current spot in green; `x` brings the player back.
 - As a float on the right edge, it is a 260 px card in the bottom-right corner. Moved to the bottom edge, it becomes the 760 px bar with a volume slider.
 - As a float with Spotify closed, nothing shows.
 - In a 268 px sidebar with `props.block`, it shows the card and the block is 124 px tall; with Spotify closed, it shrinks to 44 px.
@@ -181,7 +182,7 @@ Actions are run as `if application "Spotify" is running then tell application "S
 
 ## Files
 
-- `mods/herdrify/mod.json`
-- `mods/herdrify/main.js`
-- `mods/herdrify/*.svg` (11 Lucide icons)
+- `mods/herdify/mod.json`
+- `mods/herdify/main.js`
+- `mods/herdify/*.svg` (11 Lucide icons)
 - `preview.png`, `sidebar.png`, `floating-card.png`, `floating-bar.png`
