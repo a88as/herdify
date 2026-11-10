@@ -32,7 +32,7 @@ Left to right, while a track is loaded (playing or paused):
 2. **Player** (fills the middle, at most 640 px, centered, 4 px between its two rows).
    - Controls row, 8 px apart: shuffle, previous (`skip-back`), play/pause, next (`skip-forward`), repeat. Each side button is a 28 px square with a 6 px radius and a 14 px Lucide icon in `muted`. On hover it gets the `hover` fill and the icon turns `foreground`. Shuffle and repeat are `#1ed760` while on, and their tooltips read "Shuffle on/off" and "Repeat on/off". Play/pause is a 32 px circle with a `foreground` fill and a `background`-colored icon (`pause` while playing, `play` while paused, 14 px). On hover it turns `#1ed760` with a black icon. Its tooltip is "Pause" or "Play".
    - Time row, full width of the player, 8 px apart, 11 px text in `dim`: the elapsed time (38 px box, right-aligned), the seek bar, and the total (38 px box). Times are `m:ss` (`5:56`; no hours). The seek bar is a 14 px tall hit area holding a 4 px groove (`raised`, 2 px radius). The fill is `#1ed760` while playing and `dim` while paused, with a 10 px round `foreground` thumb.
-3. **Volume** (180 px wide, right-aligned, hidden below 720 px). A 14 px speaker icon in `dim`: `volume-x` at 0, `volume-1` under 50, `volume-2` from 50. Its tooltip is "Volume <n>". Next to it is a 110 px slider in the same style as the seek bar, with a `muted` fill.
+3. **Volume** (180 px wide, right-aligned, hidden below 720 px). A mute button: a 24 px square (6 px radius) holding a 14 px speaker icon, `volume-x` at 0, `volume-1` under 50, `volume-2` from 50. The icon is `dim`, or `foreground` while muted; on hover the button gets the `hover` fill and a `foreground` icon. Its tooltip is "Mute (volume <n>)" or "Unmute". Next to it is a 110 px slider in the same style as the seek bar, with a `muted` fill.
 
 #### Card (160 to 479 px, e.g. a 268 px sidebar)
 
@@ -71,6 +71,7 @@ Idle states replace all three regions with one centered row: a 14 px `music` ico
 - **Shown at once.** Play/pause, shuffle and repeat flip in the bar before Spotify answers, and the next read corrects them. Play/pause also freezes or restarts the clock where it stands.
 - **Seek.** Dragging the seek bar moves only the thumb and the elapsed time (the reads stop moving it while you drag). On release it runs `set player position to <seconds>`.
 - **Volume.** Dragging moves the slider. On release it runs `set sound volume to <0..100>`.
+- **Mute.** Clicking the speaker icon with the volume above 0 saves that level and sets the volume to 0. Clicking it at 0 restores the saved level, or 50 if there is none. The icon and slider change at once. The saved level is kept in `localStorage` (key `unmute`), so it survives a reload or a move. Dragging the slider up from 0 also unmutes; the saved level just isn't used.
 - **Click the track** (cover or title) or **Open Spotify**: runs `open -a Spotify`, which brings Spotify to the front or starts it.
 - **Open settings**: `open x-apple.systempreferences:com.apple.preference.security?Privacy_Automation`.
 - **Move.** A sixth button after repeat, Lucide `move`, tooltip "Move the player", opens the picker in place of the player. The picker is "Move the player to" (11.5 px `dim`), then one 28 px button per spot, then a `x` button that cancels. The bar shows them in one row; the card puts the label above the buttons. The spot the player is in now is `#1ed760` on a `raised` fill. The spots, each shown only if its parent node is in the layout:
@@ -80,7 +81,7 @@ Idle states replace all three regions with one centered row: a 14 px `music` ico
   - **Floating** (`picture-in-picture-2`): the root's `floating` list, right edge, end.
 
   Picking a spot removes the player's block (or float) from wherever it is and adds it there, then runs `layout.set`. Docked blocks get `props.block` set to their own id. The player reloads in its new place within a second, and the layout file keeps the change. On one of Herdr's own layouts (`main`, `terminals`, `win98`), it posts a warning toast instead: those can't be changed, so clone one first.
-- **Commands.** `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle` and `herdrify.repeat` do the same as the buttons. `herdrify.move` opens or closes the picker. `herdrify.dock-sidebar`, `herdrify.dock-top`, `herdrify.dock-bottom` and `herdrify.dock-float` move it directly. Bind them in `keys.json` (for example `"global": { "ctrl-alt-space": "herdrify.toggle" }`) or run `herdr-app do herdrify.next`. They reach only a shown copy.
+- **Commands.** `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle` and `herdrify.repeat` do the same as the buttons. `herdrify.mute` mutes or unmutes. `herdrify.move` opens or closes the picker. `herdrify.dock-sidebar`, `herdrify.dock-top`, `herdrify.dock-bottom` and `herdrify.dock-float` move it directly. Bind them in `keys.json` (for example `"global": { "ctrl-alt-space": "herdrify.toggle" }`) or run `herdr-app do herdrify.next`. They reach only a shown copy.
 - **Cover art.** When the track's `artwork url` changes, the mod downloads it with `curl` to `data/herdrify/art/<track id>.jpg` and deletes any other file in that folder, so only the current cover is kept.
 - **Width.** The block measures itself with `on_size_change` and picks its look from that width: bar, card (below 480 px) or rail (below 160 px). In the bar, below 720 px the volume region hides and the track region narrows to 200 px. Folding or widening a sidebar switches the look live.
 - **Height.** With `props.block` set to its own block id, the mod resizes that block to fit the look: bar 72 px, card 124 px with a track and 44 px idle, rail 52 px. It runs `layout.resize {id, px}` only when the height it wants changes. Without `props.block` the layout's size stands.
@@ -157,7 +158,7 @@ Actions are run as `if application "Spotify" is running then tell application "S
 - **Card and rail need their own heights.** The bar's 72 px clips the card. Pass `props.block` (the block's own id) so the mod resizes it, or size the block yourself: 124 px for the card. Guard the resize by remembering the last height asked for, since it runs from `render`.
 - **The first frame is drawn at an assumed 900 px** (bar look) until `on_size_change` reports the real width, so a sidebar copy shows the bar for one frame and then switches.
 - **Shipped layouts don't take the block.** `place: "bottom"` docks only into a personal layout. Add the block to a clone (`layout.clone`) or your own layout.
-- **Limits.** macOS and the Spotify desktop app only: no Spotify Web API, no Linux or Windows, no other players. Podcasts and ads show whatever Spotify reports. The speaker icon doesn't mute (it isn't a button). There is no like/save button, queue or device picker.
+- **Limits.** macOS and the Spotify desktop app only: no Spotify Web API, no Linux or Windows, no other players. Podcasts and ads show whatever Spotify reports. There is no like/save button, queue or device picker.
 
 ## Done when
 
@@ -171,6 +172,7 @@ Actions are run as `if application "Spotify" is running then tell application "S
 - `data/herdrify/art/` holds exactly one `.jpg`, the current track's.
 - Narrowing the bar below 720 px hides the volume region.
 - `herdr-app do herdrify.dock-sidebar`, `herdrify.dock-top`, `herdrify.dock-bottom` and `herdrify.dock-float` each move the player in a personal layout. Afterwards the file has exactly one `herdrify` node (or float), and nothing else in it changed.
+- `herdr-app do herdrify.mute` sets Spotify's volume to 0 and shows `volume-x` with the slider at 0; running it again puts back the earlier level.
 - `herdrify.move` shows the picker with the current spot in green; `x` brings the player back.
 - As a float on the right edge, it is a 260 px card in the bottom-right corner. Moved to the bottom edge, it becomes the 760 px bar with a volume slider.
 - As a float with Spotify closed, nothing shows.

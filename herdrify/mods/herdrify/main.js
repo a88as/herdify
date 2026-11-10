@@ -175,6 +175,7 @@ export default class Herdrify extends View {
       for (;;) {
         const c = String(await nextCommand());
         if (c in ACTIONS && c !== "seek" && c !== "volume") this.act(c, cx);
+        else if (c === "mute") this.mute(cx);
         else if (c.startsWith("dock-")) this.dock(c.slice(5), cx);
         else if (c === "move") { this.picking = !this.picking; cx.notify(); }
       }
@@ -225,6 +226,25 @@ export default class Herdrify extends View {
       for (const n of names) if (n !== `${key}.jpg`) await fs.unlink(`${appHome()}/${ART_DIR}/${n}`).catch(() => {});
     }
     s.artFile = rel;
+  }
+
+  // Mute sets Spotify's volume to 0 and keeps the level it had; unmute puts that level back
+  // (50 if none is known). The level is kept in localStorage so a reload or a move keeps it.
+  mute(cx) {
+    const s = this.state;
+    if (!s?.track) return;
+    let target;
+    if (s.volume > 0) {
+      target = 0;
+      try { localStorage.setItem("unmute", String(Math.round(s.volume))); } catch (_) {}
+    } else {
+      let before = null;
+      try { before = Number(localStorage.getItem("unmute")); } catch (_) {}
+      target = before > 0 ? before : 50;
+    }
+    s.volume = target;
+    this.vol.set_value(target);
+    this.act("volume", cx, target);
   }
 
   act(action, cx, value) {
@@ -418,7 +438,11 @@ export default class Herdrify extends View {
 
     const v = this.volDrag ? this.vol.value() : s.volume;
     const volume = (w) => h_flex().flex_none().gap(6).items_center().justify_end()
-      .child(div().flex_none().text_color(t.dim).tooltip(`Volume ${Math.round(v)}`)
+      .child(div().id("hfy-mute").size(24).flex_none().flex().items_center().justify_center().rounded(6).cursor_pointer()
+        .text_color(v === 0 ? t.foreground : t.dim).hover((el) => el.bg(t.hover).text_color(t.foreground))
+        .tooltip(v === 0 ? "Unmute" : `Mute (volume ${Math.round(v)})`)
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => this.mute(cx))
         .child(svg(ICON(v === 0 ? "volume-x" : v < 50 ? "volume-1" : "volume-2")).size(14)))
       .child(div().w(w).flex_none().child(bar(this.vol, t.muted, 4, 10)));
 

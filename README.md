@@ -53,7 +53,7 @@ It also fits the left sidebar. Below 480 px wide it becomes a stacked card, and 
 
 ## Keys
 
-The buttons are also commands: `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle`, `herdrify.repeat`. For example in `keys.json`:
+The buttons are also commands: `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle`, `herdrify.repeat`, `herdrify.mute` (click the speaker icon to mute; click again to restore the volume). For example in `keys.json`:
 
 ```json
 { "global": { "ctrl-alt-space": "herdrify.toggle", "ctrl-alt-right": "herdrify.next", "ctrl-alt-left": "herdrify.previous" } }
