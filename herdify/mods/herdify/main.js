@@ -348,7 +348,7 @@ export default class Herdify extends View {
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .child(SliderIndicator.new(state).relative().w_full().h(h).rounded(h / 2).bg(t.raised)
           .range_style((el) => el.rounded(h / 2).bg(fill))
-          .child(SliderThumb.new(state).size(thumb).rounded(thumb / 2).bg(t.foreground).ml(-thumb / 2))));
+          .child(SliderThumb.new(state).size(thumb).rounded(thumb / 2).bg(t.foreground).ml(-thumb / 2).mt(-(thumb - h) / 2))));
     const frame = (el) => measure(el.id(NAME).size_full().overflow_hidden().bg(t.background).border_t(1).border_color(t.border)
       .text_size(12).text_color(t.muted));
 
