@@ -1,6 +1,6 @@
 # Herdrify
 
-A Spotify now-playing bar (or sidebar card) for the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
+A floating Spotify player for the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
 
 ![Herdrify](herdrify/preview.png)
 
@@ -21,7 +21,21 @@ cp -R herdrify/mods/herdrify ~/.config/herdr-app/mods/
 herdr-app check ~/.config/herdr-app/mods/herdrify
 ```
 
-It docks at the bottom of a personal layout by itself. To place it yourself, add this block to a layout of your own (Herdr's shipped layouts take no new blocks; clone one first with `layout.clone`):
+Best as a floating player that you drag to any edge (a card on the sides, a bar on the top and bottom). Add this to the root of a personal layout (`layouts/<yours>.json`; Herdr's shipped layouts are read-only, so clone one first with `layout.clone`):
+
+```json
+"floating": [ { "id": "herdrify", "content": { "mod": "herdrify" }, "edge": "right", "align": "end" } ]
+```
+
+| Side edges | Top and bottom edges |
+| --- | --- |
+| ![](herdrify/floating-card.png) | ![](herdrify/floating-bar.png) |
+
+It hides itself while Spotify is closed.
+
+### Docked instead
+
+Otherwise it docks at the bottom of a personal layout by itself. To place it yourself, add this block to a layout of your own (Herdr's shipped layouts take no new blocks; clone one first with `layout.clone`):
 
 ```json
 { "id": "herdrify", "type": "block", "size": { "px": 72 }, "content": { "mod": "herdrify" } }

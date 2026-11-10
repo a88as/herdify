@@ -8,7 +8,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState } from "gpui-base";
 import * as fs from "fs/promises";
-import { exec, appHome, theme, nextCommand, props, layout, run } from "herdr";
+import { exec, appHome, theme, nextCommand, props, layout, run, placement } from "herdr";
 
 const NAME = "herdrify";
 const ICON = (name) => `mods/${NAME}/${name}.svg`;
@@ -219,8 +219,11 @@ export default class Herdrify extends View {
 
   render() {
     const t = theme(), s = this.state;
-    const mode = this.mode();
-    this.fit();
+    // Floating (a layout's "floating" list): Herdr draws the frame and people drag it to any
+    // edge. A card on the left and right edges, a bar on the top and bottom.
+    const pl = placement();
+    const mode = pl ? (pl.vertical ? "compact" : "bar") : this.mode();
+    if (!pl) this.fit();
     const measure = (el) => el.on_size_change((size, cx) => { if (Math.abs(size.width - this.width) > 2) { this.width = size.width; cx.notify(); } });
 
     const pill = (id, label, onClick) => div().id(id).px(10).py(4).rounded(12).flex_none().cursor_pointer()
@@ -260,6 +263,16 @@ export default class Herdrify extends View {
         .child(svg(ICON("music")).size(14)));
     }
 
+    if (pl && !s?.track) {
+      if (!s?.denied) return div(); // nothing to show: the float disappears
+      return h_flex().id(NAME).w(pl.vertical ? 260 : 360).px(12).py(10).gap(8).items_center().text_size(12)
+        .child(svg(ICON("music")).size(14).flex_none().text_color(t.dim))
+        .child(div().flex_1().min_w(0).truncate().text_color(t.dim)
+          .tooltip("Herdr may not control Spotify yet. Allow it in System Settings › Privacy & Security › Automation.")
+          .child("Spotify needs permission"))
+        .child(pill("hfy-settings", "Allow", () => exec("open", [AUTOMATION]).catch(() => {})));
+    }
+
     if (!s?.track) {
       const root = frame(h_flex()).px(mode === "compact" ? 12 : 14).gap(mode === "compact" ? 8 : 16).items_center().justify_center();
       const line = (text, tip) => root
@@ -281,7 +294,7 @@ export default class Herdrify extends View {
       : div().size(px).flex_none().rounded(6).bg(t.raised).flex().items_center().justify_center().text_color(t.dim).child(svg(ICON("disc-3")).size(px * 0.42));
     const track = (px, titleSize) => h_flex().id("hfy-track").min_w(0).gap(10).items_center().cursor_pointer()
       .tooltip(`${s.title} · ${s.artist} · ${s.album}\nClick to show Spotify`)
-      .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+      .when(!pl, (el) => el.on_mouse_down("left", (_e, cx) => cx.stop_propagation()))
       .on_click((_e, cx) => this.openSpotify(cx))
       .child(cover(px))
       .child(v_flex().flex_1().min_w(0).gap(2)
@@ -298,6 +311,28 @@ export default class Herdrify extends View {
       .child(bar(this.seek, s.playing ? GREEN : t.dim, 4, 10))
       .child(div().w(timeW).flex_none().text_color(t.dim).child(clock(s.duration)));
 
+    const v = this.volDrag ? this.vol.value() : s.volume;
+    const volume = (w) => h_flex().flex_none().gap(6).items_center().justify_end()
+      .child(div().flex_none().text_color(t.dim).tooltip(`Volume ${Math.round(v)}`)
+        .child(svg(ICON(v === 0 ? "volume-x" : v < 50 ? "volume-1" : "volume-2")).size(14)))
+      .child(div().w(w).flex_none().child(bar(this.vol, t.muted, 4, 10)));
+
+    if (pl) {
+      // Sized by its content; no fill or border of its own (Herdr's frame has them).
+      if (pl.vertical) {
+        return v_flex().id(NAME).w(260).px(12).py(10).gap(8).text_size(12).text_color(t.muted)
+          .child(track(40, 12.5))
+          .child(seekRow(30, 10.5))
+          .child(controls(4));
+      }
+      return h_flex().id(NAME).w(760).h(64).px(12).gap(14).items_center().text_size(12).text_color(t.muted)
+        .child(track(44, 13).w(220).flex_none())
+        .child(v_flex().flex_1().min_w(0).gap(2).items_center()
+          .child(controls(6))
+          .child(seekRow(34, 10.5)))
+        .child(volume(80));
+    }
+
     // Side panel: a stacked card.
     if (mode === "compact") {
       return frame(v_flex()).px(12).py(10).gap(8).justify_center()
@@ -308,15 +343,11 @@ export default class Herdrify extends View {
 
     // Full width: the bar.
     const narrow = this.width < 720;
-    const v = this.volDrag ? this.vol.value() : s.volume;
     return frame(h_flex()).px(14).gap(16).items_center()
       .child(track(48, 13).w(narrow ? 200 : 280).flex_none())
       .child(v_flex().flex_1().min_w(0).max_w(640).mx_auto().gap(4).items_center()
         .child(controls(8))
         .child(seekRow(38, 11)))
-      .child(h_flex().w(narrow ? 0 : 180).flex_none().gap(6).items_center().justify_end().when(narrow, (el) => el.hidden())
-        .child(div().flex_none().text_color(t.dim).tooltip(`Volume ${Math.round(v)}`)
-          .child(svg(ICON(v === 0 ? "volume-x" : v < 50 ? "volume-1" : "volume-2")).size(14)))
-        .child(div().w(110).flex_none().child(bar(this.vol, t.muted, 4, 10))));
+      .child(volume(110).w(narrow ? 0 : 180).when(narrow, (el) => el.hidden()));
   }
 }
