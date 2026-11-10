@@ -8,13 +8,18 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState } from "gpui-base";
 import * as fs from "fs/promises";
-import { exec, appHome, theme, nextCommand } from "herdr";
+import { exec, appHome, theme, nextCommand, props, layout, run } from "herdr";
 
 const NAME = "herdrify";
 const ICON = (name) => `mods/${NAME}/${name}.svg`;
 const GREEN = "#1ed760";
 const ART_DIR = "data/herdrify/art"; // under appHome(): image() paths are relative to it
 const SEP = "\u001f";
+// Widths below these switch the look: a stacked card for a side panel, one button for a folded rail.
+const COMPACT_BELOW = 480;
+const RAIL_BELOW = 160;
+// Block heights per look, used when props.block names the block to fit.
+const HEIGHT = { bar: 72, compact: 124, compactIdle: 44, rail: 52 };
 const AUTOMATION = "x-apple.systempreferences:com.apple.preference.security?Privacy_Automation";
 
 const READ = `if application "Spotify" is running then
@@ -70,6 +75,15 @@ function parse(r) {
     volume: num(volume),
     at: Date.now(),
   };
+}
+
+function find(node, id) {
+  if (node?.id === id) return node;
+  for (const c of node?.children ?? []) {
+    const f = find(c, id);
+    if (f) return f;
+  }
+  return null;
 }
 
 export default class Herdrify extends View {
@@ -185,81 +199,124 @@ export default class Herdrify extends View {
     });
   }
 
+  mode() {
+    return this.width < RAIL_BELOW ? "rail" : this.width < COMPACT_BELOW ? "compact" : "bar";
+  }
+
+  // With props.block, the block takes the height its look needs (a stacked card is taller
+  // than the bar, idle is shorter). Without it, the layout's size stands.
+  fit() {
+    const id = props()?.block;
+    if (!id) return;
+    const m = this.mode(), track = !!this.state?.track;
+    const px = m === "bar" ? HEIGHT.bar : m === "rail" ? HEIGHT.rail : track ? HEIGHT.compact : HEIGHT.compactIdle;
+    if (px === this.fitted) return;
+    const node = find(layout(), id);
+    if (!node) return;
+    this.fitted = px;
+    if (node.size?.px !== px) run("layout.resize", { id, px });
+  }
+
   render() {
     const t = theme(), s = this.state;
-    const root = h_flex().id(NAME).size_full().px(14).gap(16).items_center().overflow_hidden()
-      .bg(t.background).border_t(1).border_color(t.border).text_size(12).text_color(t.muted)
-      .on_size_change((size, cx) => { if (Math.abs(size.width - this.width) > 2) { this.width = size.width; cx.notify(); } });
+    const mode = this.mode();
+    this.fit();
+    const measure = (el) => el.on_size_change((size, cx) => { if (Math.abs(size.width - this.width) > 2) { this.width = size.width; cx.notify(); } });
 
     const pill = (id, label, onClick) => div().id(id).px(10).py(4).rounded(12).flex_none().cursor_pointer()
       .bg(t.raised).text_color(t.foreground).text_size(11.5).hover((el) => el.bg(t.hover))
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click((_e, cx) => onClick(cx)).child(label);
-
-    if (!s?.track) {
-      const line = (text) => root.justify_center()
-        .child(svg(ICON("music")).size(14).flex_none().text_color(t.dim))
-        .child(div().min_w(0).truncate().text_color(t.dim).child(text));
-      if (!s) return line("Looking for Spotify…");
-      if (s.denied) return line("Herdr may not control Spotify yet. Allow it in System Settings › Privacy & Security › Automation.")
-        .child(pill("hfy-settings", "Open settings", () => exec("open", [AUTOMATION]).catch(() => {})));
-      return line(s.off ? "Spotify isn't running" : "Nothing playing in Spotify")
-        .child(pill("hfy-open", "Open Spotify", (cx) => this.openSpotify(cx)));
-    }
-
-    const narrow = this.width < 720;
     const btn = (id, icon, tip, on = false) => div().id(`hfy-${id}`).size(28).flex_none().flex().items_center().justify_center()
       .rounded(6).cursor_pointer().text_color(on ? GREEN : t.muted)
       .hover((el) => el.bg(t.hover).text_color(on ? GREEN : t.foreground)).tooltip(tip)
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click((_e, cx) => this.act(id, cx))
       .child(svg(ICON(icon)).size(14));
-    const play = div().id("hfy-toggle").size(32).flex_none().flex().items_center().justify_center()
+    const playBtn = () => div().id("hfy-toggle").size(32).flex_none().flex().items_center().justify_center()
       .rounded(16).cursor_pointer().bg(t.foreground).text_color(t.background)
-      .hover((el) => el.bg(GREEN).text_color("#000000")).tooltip(s.playing ? "Pause" : "Play")
+      .hover((el) => el.bg(GREEN).text_color("#000000")).tooltip(s.playing ? `Pause · ${s.title}` : `Play · ${s.title}`)
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click((_e, cx) => this.act("toggle", cx))
       .child(svg(ICON(s.playing ? "pause" : "play")).size(14));
-
     const bar = (state, fill, h, thumb) => Slider.new(state).flex_1().min_w(0).child(
       SliderTrack.new(state).flex().items_center().h(14).w_full().cursor_pointer()
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .child(SliderIndicator.new(state).relative().w_full().h(h).rounded(h / 2).bg(t.raised)
           .range_style((el) => el.rounded(h / 2).bg(fill))
           .child(SliderThumb.new(state).size(thumb).rounded(thumb / 2).bg(t.foreground).ml(-thumb / 2))));
+    const frame = (el) => measure(el.id(NAME).size_full().overflow_hidden().bg(t.background).border_t(1).border_color(t.border)
+      .text_size(12).text_color(t.muted));
+
+    // Folded sidebar: one button.
+    if (mode === "rail") {
+      const box = frame(div()).flex().items_center().justify_center();
+      if (s?.track) return box.child(playBtn());
+      return box.child(div().id("hfy-open").size(28).flex().items_center().justify_center().rounded(6).cursor_pointer()
+        .text_color(t.dim).hover((el) => el.bg(t.hover).text_color(t.foreground))
+        .tooltip(s?.denied ? "Allow Herdr to control Spotify in System Settings" : "Open Spotify")
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => s?.denied ? exec("open", [AUTOMATION]).catch(() => {}) : this.openSpotify(cx))
+        .child(svg(ICON("music")).size(14)));
+    }
+
+    if (!s?.track) {
+      const root = frame(h_flex()).px(mode === "compact" ? 12 : 14).gap(mode === "compact" ? 8 : 16).items_center().justify_center();
+      const line = (text, tip) => root
+        .child(svg(ICON("music")).size(14).flex_none().text_color(t.dim))
+        .child(div().flex_shrink(1).min_w(0).truncate().text_color(t.dim).when(!!tip, (el) => el.tooltip(tip)).child(text));
+      if (!s) return line("Looking for Spotify…");
+      if (s.denied) {
+        const full = "Herdr may not control Spotify yet. Allow it in System Settings › Privacy & Security › Automation.";
+        return line(mode === "compact" ? "Spotify needs permission" : full, full)
+          .child(pill("hfy-settings", mode === "compact" ? "Allow" : "Open settings", () => exec("open", [AUTOMATION]).catch(() => {})));
+      }
+      return line(s.off ? (mode === "compact" ? "Spotify is closed" : "Spotify isn't running") : "Nothing playing")
+        .child(pill("hfy-open", "Open Spotify", (cx) => this.openSpotify(cx)));
+    }
 
     const shown = this.seekDrag && s.duration ? (this.seek.value() / 1000) * s.duration : this.position();
-    const cover = s.artFile
-      ? image(s.artFile).size(48).flex_none().rounded(6)
-      : div().size(48).flex_none().rounded(6).bg(t.raised).flex().items_center().justify_center().text_color(t.dim).child(svg(ICON("disc-3")).size(20));
-
-    const left = h_flex().id("hfy-track").w(narrow ? 200 : 280).flex_none().min_w(0).gap(10).items_center().cursor_pointer()
+    const cover = (px) => s.artFile
+      ? image(s.artFile).size(px).flex_none().rounded(6)
+      : div().size(px).flex_none().rounded(6).bg(t.raised).flex().items_center().justify_center().text_color(t.dim).child(svg(ICON("disc-3")).size(px * 0.42));
+    const track = (px, titleSize) => h_flex().id("hfy-track").min_w(0).gap(10).items_center().cursor_pointer()
       .tooltip(`${s.title} · ${s.artist} · ${s.album}\nClick to show Spotify`)
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
       .on_click((_e, cx) => this.openSpotify(cx))
-      .child(cover)
+      .child(cover(px))
       .child(v_flex().flex_1().min_w(0).gap(2)
-        .child(div().truncate().text_size(13).font_medium().text_color(s.playing ? t.foreground : t.muted).child(s.title))
+        .child(div().truncate().text_size(titleSize).font_medium().text_color(s.playing ? t.foreground : t.muted).child(s.title))
         .child(div().truncate().text_size(11.5).text_color(t.dim).child(s.artist)));
+    const controls = (gap) => h_flex().gap(gap).items_center().justify_center()
+      .child(btn("shuffle", "shuffle", s.shuffle ? "Shuffle on" : "Shuffle off", s.shuffle))
+      .child(btn("previous", "skip-back", "Previous"))
+      .child(playBtn())
+      .child(btn("next", "skip-forward", "Next"))
+      .child(btn("repeat", "repeat", s.repeat ? "Repeat on" : "Repeat off", s.repeat));
+    const seekRow = (timeW, size) => h_flex().w_full().gap(size < 11 ? 6 : 8).items_center().text_size(size)
+      .child(div().w(timeW).flex_none().text_right().text_color(t.dim).child(clock(shown)))
+      .child(bar(this.seek, s.playing ? GREEN : t.dim, 4, 10))
+      .child(div().w(timeW).flex_none().text_color(t.dim).child(clock(s.duration)));
 
-    const center = v_flex().flex_1().min_w(0).max_w(640).mx_auto().gap(4).items_center()
-      .child(h_flex().gap(8).items_center()
-        .child(btn("shuffle", "shuffle", s.shuffle ? "Shuffle on" : "Shuffle off", s.shuffle))
-        .child(btn("previous", "skip-back", "Previous"))
-        .child(play)
-        .child(btn("next", "skip-forward", "Next"))
-        .child(btn("repeat", "repeat", s.repeat ? "Repeat on" : "Repeat off", s.repeat)))
-      .child(h_flex().w_full().gap(8).items_center().text_size(11)
-        .child(div().w(38).flex_none().text_right().text_color(t.dim).child(clock(shown)))
-        .child(bar(this.seek, s.playing ? GREEN : t.dim, 4, 10))
-        .child(div().w(38).flex_none().text_color(t.dim).child(clock(s.duration))));
+    // Side panel: a stacked card.
+    if (mode === "compact") {
+      return frame(v_flex()).px(12).py(10).gap(8).justify_center()
+        .child(track(40, 12.5))
+        .child(seekRow(30, 10.5))
+        .child(controls(4));
+    }
 
+    // Full width: the bar.
+    const narrow = this.width < 720;
     const v = this.volDrag ? this.vol.value() : s.volume;
-    const right = h_flex().w(narrow ? 0 : 180).flex_none().gap(6).items_center().justify_end().when(narrow, (el) => el.hidden())
-      .child(div().flex_none().text_color(t.dim).tooltip(`Volume ${Math.round(v)}`)
-        .child(svg(ICON(v === 0 ? "volume-x" : v < 50 ? "volume-1" : "volume-2")).size(14)))
-      .child(div().w(110).flex_none().child(bar(this.vol, t.muted, 4, 10)));
-
-    return root.child(left).child(center).child(right);
+    return frame(h_flex()).px(14).gap(16).items_center()
+      .child(track(48, 13).w(narrow ? 200 : 280).flex_none())
+      .child(v_flex().flex_1().min_w(0).max_w(640).mx_auto().gap(4).items_center()
+        .child(controls(8))
+        .child(seekRow(38, 11)))
+      .child(h_flex().w(narrow ? 0 : 180).flex_none().gap(6).items_center().justify_end().when(narrow, (el) => el.hidden())
+        .child(div().flex_none().text_color(t.dim).tooltip(`Volume ${Math.round(v)}`)
+          .child(svg(ICON(v === 0 ? "volume-x" : v < 50 ? "volume-1" : "volume-2")).size(14)))
+        .child(div().w(110).flex_none().child(bar(this.vol, t.muted, 4, 10))));
   }
 }

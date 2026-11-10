@@ -1,6 +1,6 @@
 # Herdrify
 
-A Spotify now-playing bar for the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
+A Spotify now-playing bar (or sidebar card) for the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
 
 ![Herdrify](herdrify/preview.png)
 
@@ -26,6 +26,14 @@ It docks at the bottom of a personal layout by itself. To place it yourself, add
 ```json
 { "id": "herdrify", "type": "block", "size": { "px": 72 }, "content": { "mod": "herdrify" } }
 ```
+
+It also fits the left sidebar. Below 480 px wide it becomes a stacked card, and in a folded sidebar it is a single play/pause button. Put it in the `sidebar` column above `sidebar-footer`, and pass its own id as `block` so it sizes itself:
+
+```json
+{ "id": "herdrify", "type": "block", "size": { "px": 124 }, "content": { "mod": "herdrify", "props": { "block": "herdrify" } } }
+```
+
+![Herdrify in the sidebar](herdrify/sidebar.png)
 
 ## Keys
 

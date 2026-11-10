@@ -1,10 +1,14 @@
 # Herdrify
 
-A Spotify now-playing bar along the foot of the Herdr window. On the left is the album cover, the track title and the artist. In the middle are shuffle, previous, play/pause, next and repeat, with a seek bar and the elapsed and total time under them. On the right is a volume bar. It controls the Spotify desktop app on macOS through AppleScript. When Spotify isn't running or nothing is playing, the bar shows one centered line with an "Open Spotify" button.
+A Spotify now-playing bar along the foot of the Herdr window. On the left is the album cover, the track title and the artist. In the middle are shuffle, previous, play/pause, next and repeat, with a seek bar and the elapsed and total time under them. On the right is a volume bar. It controls the Spotify desktop app on macOS through AppleScript. When Spotify isn't running or nothing is playing, the bar shows one centered line with an "Open Spotify" button. The same mod fits a side panel: narrower than 480 px it becomes a stacked card (cover and title, seek bar, controls), and narrower than 160 px (a folded sidebar) it is a single play/pause button.
 
 ![Herdrify](preview.png)
 
 ## What you see
+
+The look depends on the block's width: **bar** from 480 px, **card** from 160 px, **rail** below that.
+
+### Bar (480 px and wider)
 
 One 72 px tall block across the full width of the window. It has the theme `background` fill and a 1 px top border in theme `border`. Contents are vertically centered, with 14 px of padding left and right and 16 px between the three regions. Text is 12 px in `muted` unless stated otherwise. Every color comes from `theme()` except Spotify green, `#1ed760`.
 
@@ -15,6 +19,24 @@ Left to right, while a track is loaded (playing or paused):
    - Controls row, 8 px apart: shuffle, previous (`skip-back`), play/pause, next (`skip-forward`), repeat. Each side button is a 28 px square with a 6 px radius and a 14 px Lucide icon in `muted`. On hover it gets the `hover` fill and the icon turns `foreground`. Shuffle and repeat are `#1ed760` while on, and their tooltips read "Shuffle on/off" and "Repeat on/off". Play/pause is a 32 px circle with a `foreground` fill and a `background`-colored icon (`pause` while playing, `play` while paused, 14 px). On hover it turns `#1ed760` with a black icon. Its tooltip is "Pause" or "Play".
    - Time row, full width of the player, 8 px apart, 11 px text in `dim`: the elapsed time (38 px box, right-aligned), the seek bar, and the total (38 px box). Times are `m:ss` (`5:56`; no hours). The seek bar is a 14 px tall hit area holding a 4 px groove (`raised`, 2 px radius). The fill is `#1ed760` while playing and `dim` while paused, with a 10 px round `foreground` thumb.
 3. **Volume** (180 px wide, right-aligned, hidden below 720 px). A 14 px speaker icon in `dim`: `volume-x` at 0, `volume-1` under 50, `volume-2` from 50. Its tooltip is "Volume <n>". Next to it is a 110 px slider in the same style as the seek bar, with a `muted` fill.
+
+### Card (160 to 479 px, e.g. a 268 px sidebar)
+
+![Herdrify in the sidebar](sidebar.png)
+
+A column with 12 px horizontal and 10 px vertical padding, 8 px between rows, the same `background` fill and top border. 124 px tall with a track.
+
+1. Track: a 40 px cover (6 px radius), then the title (12.5 px medium, truncated) over the artist (11.5 px `dim`). Same colors, tooltip and click as the bar.
+2. Seek row: elapsed time (30 px box, right-aligned), the seek bar, total (30 px box), 10.5 px `dim` text, 6 px apart.
+3. Controls: the same five buttons as the bar, 4 px apart, centered.
+
+There is no volume slider in the card. Idle, the card is one 44 px row with shorter wording: "Spotify is closed" or "Nothing playing" with **Open Spotify**, or "Spotify needs permission" with an **Allow** pill (its tooltip carries the full sentence).
+
+### Rail (narrower than 160 px, e.g. a sidebar folded to 76 px)
+
+52 px tall, one centered button. With a track it is the 32 px play/pause circle; its tooltip is "Pause · <title>" or "Play · <title>". Without a track it is a 28 px `music` icon button in `dim` that opens Spotify (or the Automation settings after a refusal).
+
+### Idle (bar)
 
 Idle states replace all three regions with one centered row: a 14 px `music` icon in `dim`, a truncated `dim` line, and a pill button (10 px by 4 px padding, 12 px radius, `raised` fill, `foreground` 11.5 px text, `hover` fill on hover):
 
@@ -39,21 +61,30 @@ Idle states replace all three regions with one centered row: a 14 px `music` ico
 - **Open settings**: `open x-apple.systempreferences:com.apple.preference.security?Privacy_Automation`.
 - **Commands.** `herdrify.toggle`, `herdrify.next`, `herdrify.previous`, `herdrify.shuffle` and `herdrify.repeat` do the same as the buttons. Bind them in `keys.json` (for example `"global": { "ctrl-alt-space": "herdrify.toggle" }`) or run `herdr-app do herdrify.next`. They reach only a shown copy.
 - **Cover art.** When the track's `artwork url` changes, the mod downloads it with `curl` to `data/herdrify/art/<track id>.jpg` and deletes any other file in that folder, so only the current cover is kept.
-- **Width.** The block measures itself with `on_size_change`. Below 720 px the volume region hides and the track region narrows to 200 px.
+- **Width.** The block measures itself with `on_size_change` and picks its look from that width: bar, card (below 480 px) or rail (below 160 px). In the bar, below 720 px the volume region hides and the track region narrows to 200 px. Folding or widening a sidebar switches the look live.
+- **Height.** With `props.block` set to its own block id, the mod resizes that block to fit the look: bar 72 px, card 124 px with a track and 44 px idle, rail 52 px. It runs `layout.resize {id, px}` only when the height it wants changes. Without `props.block` the layout's size stands.
 
 ## Built from
 
-**mod.json**: `{ "place": "bottom", "size": 72, "title": "Herdrify" }`. When Herdr first sees the folder it docks one copy at the bottom of the shown layout, if that layout is a personal one (Herdr's shipped layouts take no new blocks). To place it yourself, add a block to a personal layout:
+**mod.json**: `{ "place": "bottom", "size": 72, "title": "Herdrify" }`. When Herdr first sees the folder it docks one copy at the bottom of the shown layout, if that layout is a personal one (Herdr's shipped layouts take no new blocks). To place it yourself, add a block to a personal layout. Across the window or the work area:
 
 ```json
 { "id": "herdrify", "type": "block", "size": { "px": 72 }, "content": { "mod": "herdrify" } }
 ```
 
+In the shipped sidebar (`sidebar` column), between `sidebar-lists` and `sidebar-footer`, with `props.block` so it sizes itself:
+
+```json
+{ "id": "herdrify", "type": "block", "size": { "px": 124 }, "content": { "mod": "herdrify", "props": { "block": "herdrify" } } }
+```
+
+**Props:** `block` (optional): the id of the block holding this copy, so it can fit its height.
+
 **Files** in `mods/herdrify/`: `main.js`, `mod.json`, and Lucide icons (lucide-static 0.460.0, ISC): `play`, `pause`, `skip-back`, `skip-forward`, `shuffle`, `repeat`, `volume-1`, `volume-2`, `volume-x`, `music`, `disc-3` (`.svg`). They are drawn with `svg("mods/herdrify/<name>.svg")`, so they take the text color.
 
 **main.js** is one `View` class.
 
-- Imports: `View, div, svg, image` from `gpui-kit`; `h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState` from `gpui-base`; `fs/promises`; `exec, appHome, theme, nextCommand` from `herdr`.
+- Imports: `View, div, svg, image` from `gpui-kit`; `h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState` from `gpui-base`; `fs/promises`; `exec, appHome, theme, nextCommand, props, layout, run` from `herdr`.
 - Two `SliderState`s are made in `init`: seek `0..1000` (per mille of the track) and volume `0..100`. Their `change` events set a dragging flag. Their `release` events send the command.
 - Timers: one `cx.timer.every(1000)` for the clock and the read schedule, and `cx.timer.after(300)` after previous/next.
 - The cover is drawn with `image("data/herdrify/art/<id>.jpg")`. Paths are relative to `appHome()`.
@@ -89,6 +120,8 @@ Actions are run as `if application "Spotify" is running then tell application "S
 - **Don't name an AppleScript variable `st`.** Inside `tell application "Spotify"` it is a syntax error ("Expected expression but found st").
 - **Units differ.** `duration` is milliseconds and `player position` is seconds. The numbers come back with the locale's decimal mark (`12,5`), so replace `,` with `.` before parsing.
 - **Don't push slider values while dragging,** or the timer pulls the thumb back from under the pointer. Set them only when the dragging flag is off.
+- **Card and rail need their own heights.** The bar's 72 px clips the card. Pass `props.block` (the block's own id) so the mod resizes it, or size the block yourself: 124 px for the card. Guard the resize by remembering the last height asked for, since it runs from `render`.
+- **The first frame is drawn at an assumed 900 px** (bar look) until `on_size_change` reports the real width, so a sidebar copy shows the bar for one frame and then switches.
 - **Shipped layouts don't take the block.** `place: "bottom"` docks only into a personal layout. Add the block to a clone (`layout.clone`) or your own layout.
 - **Limits.** macOS and the Spotify desktop app only: no Spotify Web API, no Linux or Windows, no other players. Podcasts and ads show whatever Spotify reports. The speaker icon doesn't mute (it isn't a button). There is no like/save button, queue or device picker.
 
@@ -102,11 +135,13 @@ Actions are run as `if application "Spotify" is running then tell application "S
 - Dragging the seek bar and letting go moves Spotify to that point. Dragging the volume bar changes Spotify's volume.
 - Next and previous change the track, and the new title and cover show within a second.
 - `data/herdrify/art/` holds exactly one `.jpg`, the current track's.
-- Narrowing the block below 720 px hides the volume region.
+- Narrowing the bar below 720 px hides the volume region.
+- In a 268 px sidebar with `props.block`, it shows the card and the block is 124 px tall; with Spotify closed, it shrinks to 44 px.
+- Folding the sidebar to 76 px leaves a single play/pause button that still pauses and plays.
 
 ## Files
 
 - `mods/herdrify/mod.json`
 - `mods/herdrify/main.js`
 - `mods/herdrify/*.svg` (11 Lucide icons)
-- `preview.png`
+- `preview.png`, `sidebar.png`
