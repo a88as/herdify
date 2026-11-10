@@ -8,7 +8,7 @@
 import { View, div, svg, image } from "gpui-kit";
 import { h_flex, v_flex, Slider, SliderTrack, SliderIndicator, SliderThumb, SliderState } from "gpui-base";
 import * as fs from "fs/promises";
-import { exec, appHome, theme, nextCommand, props, layout, run, placement } from "herdr";
+import { exec, appHome, theme, nextCommand, props, layout, run, placement, shared, notify, readTextFile } from "herdr";
 
 const NAME = "herdrify";
 const ICON = (name) => `mods/${NAME}/${name}.svg`;
@@ -77,6 +77,56 @@ function parse(r) {
   };
 }
 
+// Where the player can live. Each docked spot names its parent node (by the shipped ids) and
+// where in it to go; a spot shows in the picker only if its parent is in the shown layout.
+const SPOTS = [
+  { key: "sidebar", icon: "panel-left", label: "Sidebar", parent: "sidebar", before: "sidebar-footer", px: 124 },
+  { key: "top", icon: "panel-top", label: "Top of the work area", parent: "work", after: "tabs", px: 72 },
+  { key: "bottom", icon: "panel-bottom", label: "Above the status bar", parent: "work", before: "status", px: 72 },
+  { key: "float", icon: "picture-in-picture-2", label: "Floating (drag to any edge)" },
+];
+const SHIPPED = ["main", "terminals", "win98"];
+
+function parentOf(node, id) {
+  for (const c of node?.children ?? []) {
+    if (c.id === id) return node;
+    const f = parentOf(c, id);
+    if (f) return f;
+  }
+  return null;
+}
+
+// The spot this copy sits in now, from the shown layout.
+function currentSpot(tree, id) {
+  if ((tree?.floating ?? []).some((f) => f.id === id)) return "float";
+  const p = parentOf(tree, id);
+  const kids = (p?.children ?? []).map((c) => c.id);
+  return SPOTS.find((sp) => sp.parent && sp.parent === p?.id
+    && (!sp.before || kids.indexOf(sp.before) === kids.indexOf(id) + 1)
+    && (!sp.after || kids.indexOf(sp.after) === kids.indexOf(id) - 1))?.key ?? null;
+}
+
+// The layout with the player moved to spot: taken out wherever it is, put in the new place.
+function moved(tree, spot, id) {
+  const t = JSON.parse(JSON.stringify(tree));
+  const strip = (n) => { if (n.children) { n.children = n.children.filter((c) => c.id !== id); n.children.forEach(strip); } };
+  strip(t);
+  if (t.floating) t.floating = t.floating.filter((f) => f.id !== id);
+  const sp = SPOTS.find((x) => x.key === spot);
+  if (spot === "float") {
+    (t.floating ??= []).push({ id, content: { mod: NAME }, edge: "right", align: "end" });
+    return t;
+  }
+  const parent = find(t, sp.parent);
+  if (!parent?.children) return null;
+  const kids = parent.children.map((c) => c.id);
+  let at = kids.length;
+  if (sp.before && kids.includes(sp.before)) at = kids.indexOf(sp.before);
+  if (sp.after && kids.includes(sp.after)) at = kids.indexOf(sp.after) + 1;
+  parent.children.splice(at, 0, { id, type: "block", size: { px: sp.px }, content: { mod: NAME, props: { block: id } } });
+  return t;
+}
+
 function find(node, id) {
   if (node?.id === id) return node;
   for (const c of node?.children ?? []) {
@@ -125,6 +175,8 @@ export default class Herdrify extends View {
       for (;;) {
         const c = String(await nextCommand());
         if (c in ACTIONS && c !== "seek" && c !== "volume") this.act(c, cx);
+        else if (c.startsWith("dock-")) this.dock(c.slice(5), cx);
+        else if (c === "move") { this.picking = !this.picking; cx.notify(); }
       }
     });
   }
@@ -192,6 +244,35 @@ export default class Herdrify extends View {
     });
   }
 
+  // The block id this copy has in the layout: props.block when docked, else the float's id.
+  ownId() {
+    return props()?.block ?? NAME;
+  }
+
+  spots() {
+    const tree = layout();
+    return SPOTS.filter((sp) => sp.key === "float" || find(tree, sp.parent));
+  }
+
+  dock(spot, cx) {
+    this.picking = false;
+    cx.notify();
+    const name = String(shared("layout") ?? "");
+    if (SHIPPED.includes(name)) {
+      notify({ title: "Herdrify", body: `"${name}" is one of Herdr's own layouts and can't be changed. Clone it first (Duplicate layout).`, level: "warning" });
+      return;
+    }
+    if (currentSpot(layout(), this.ownId()) === spot) return;
+    // Edit the layout file, not layout(): that one has the person's clicks (sizes, the shown
+    // panel tab, theme picks) folded in, and layout.set would write them into the file.
+    cx.spawn(async () => {
+      let tree = null;
+      try { tree = JSON.parse((await readTextFile(`${appHome()}/layouts/${name}.json`)) ?? "null"); } catch (_) {}
+      const next = tree && moved(tree, spot, this.ownId());
+      if (next) run("layout.set", { layout: next });
+    });
+  }
+
   openSpotify(cx) {
     cx.spawn(async (cx) => {
       await exec("open", ["-a", "Spotify"]).catch(() => {});
@@ -234,7 +315,7 @@ export default class Herdrify extends View {
       .rounded(6).cursor_pointer().text_color(on ? GREEN : t.muted)
       .hover((el) => el.bg(t.hover).text_color(on ? GREEN : t.foreground)).tooltip(tip)
       .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
-      .on_click((_e, cx) => this.act(id, cx))
+      .on_click((_e, cx) => { if (id === "move") { this.picking = true; cx.notify(); } else this.act(id, cx); })
       .child(svg(ICON(icon)).size(14));
     const playBtn = () => div().id("hfy-toggle").size(32).flex_none().flex().items_center().justify_center()
       .rounded(16).cursor_pointer().bg(t.foreground).text_color(t.background)
@@ -261,6 +342,29 @@ export default class Herdrify extends View {
         .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
         .on_click((_e, cx) => s?.denied ? exec("open", [AUTOMATION]).catch(() => {}) : this.openSpotify(cx))
         .child(svg(ICON("music")).size(14)));
+    }
+
+    if (this.picking && mode !== "rail") {
+      const here = currentSpot(layout(), this.ownId());
+      const choices = h_flex().gap(4).items_center().children(this.spots().map((sp) =>
+        div().id(`hfy-dock-${sp.key}`).size(28).flex_none().flex().items_center().justify_center().rounded(6).cursor_pointer()
+          .text_color(sp.key === here ? GREEN : t.muted).when(sp.key === here, (el) => el.bg(t.raised))
+          .hover((el) => el.bg(t.hover).text_color(sp.key === here ? GREEN : t.foreground)).tooltip(sp.label)
+          .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+          .on_click((_e, cx) => this.dock(sp.key, cx))
+          .child(svg(ICON(sp.icon)).size(14))));
+      const cancel = div().id("hfy-dock-cancel").size(28).flex_none().flex().items_center().justify_center().rounded(6)
+        .cursor_pointer().text_color(t.dim).hover((el) => el.bg(t.hover).text_color(t.foreground)).tooltip("Cancel")
+        .on_mouse_down("left", (_e, cx) => cx.stop_propagation())
+        .on_click((_e, cx) => { this.picking = false; cx.notify(); })
+        .child(svg(ICON("x")).size(14));
+      const label = div().text_color(t.dim).text_size(11.5).child("Move the player to");
+      const body = mode === "compact"
+        ? v_flex().gap(8).items_center().child(label).child(h_flex().gap(4).items_center().child(choices).child(cancel))
+        : h_flex().gap(12).items_center().justify_center().child(label).child(choices).child(cancel);
+      if (pl) return v_flex().id(NAME).w(pl.vertical ? 260 : 760).h(pl.vertical ? 124 : 64).px(12).py(10).justify_center().items_center().text_size(12).child(body);
+      return measure(v_flex().id(NAME).size_full().overflow_hidden().bg(t.background).border_t(1).border_color(t.border)
+        .px(12).justify_center().items_center().text_size(12)).child(body);
     }
 
     if (pl && !s?.track) {
@@ -305,7 +409,8 @@ export default class Herdrify extends View {
       .child(btn("previous", "skip-back", "Previous"))
       .child(playBtn())
       .child(btn("next", "skip-forward", "Next"))
-      .child(btn("repeat", "repeat", s.repeat ? "Repeat on" : "Repeat off", s.repeat));
+      .child(btn("repeat", "repeat", s.repeat ? "Repeat on" : "Repeat off", s.repeat))
+      .child(btn("move", "move", "Move the player"));
     const seekRow = (timeW, size) => h_flex().w_full().gap(size < 11 ? 6 : 8).items_center().text_size(size)
       .child(div().w(timeW).flex_none().text_right().text_color(t.dim).child(clock(shown)))
       .child(bar(this.seek, s.playing ? GREEN : t.dim, 4, 10))

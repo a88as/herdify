@@ -1,6 +1,6 @@
 # Herdrify
 
-A floating Spotify player for the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
+A Spotify player you can dock or float in the [Herdr](https://herdr.dev) desktop app: album cover, title and artist, shuffle, previous, play/pause, next and repeat, a seek bar and a volume bar, docked at the foot of the window.
 
 ![Herdrify](herdrify/preview.png)
 
@@ -21,7 +21,9 @@ cp -R herdrify/mods/herdrify ~/.config/herdr-app/mods/
 herdr-app check ~/.config/herdr-app/mods/herdrify
 ```
 
-Best as a floating player that you drag to any edge (a card on the sides, a bar on the top and bottom). Add this to the root of a personal layout (`layouts/<yours>.json`; Herdr's shipped layouts are read-only, so clone one first with `layout.clone`):
+**Moving it:** the move button (four arrows, after repeat) offers the sidebar, the top of the work area, above the status bar, or floating. It edits your layout for you; it works in personal layouts only.
+
+It can also be a floating player that you drag to any edge (a card on the sides, a bar on the top and bottom). Add this to the root of a personal layout (`layouts/<yours>.json`; Herdr's shipped layouts are read-only, so clone one first with `layout.clone`):
 
 ```json
 "floating": [ { "id": "herdrify", "content": { "mod": "herdrify" }, "edge": "right", "align": "end" } ]
